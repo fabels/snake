@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 
-import { BehaviorSubject, fromEvent, interval, Subject, switchMap, takeUntil } from 'rxjs';
+import { BehaviorSubject, filter, fromEvent, interval, map, Subject, switchMap, takeUntil, takeWhile } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -13,6 +13,11 @@ export class AppComponent implements OnInit, OnDestroy {
   blockSize = 35;
   blockMargin = 1;
   blockBorderWidth = 0;
+  points = 0;
+  currentLevel = 0;
+  levelChange$ = new BehaviorSubject(0);
+  countdown = 3;
+  blockType = BlockType;
 
   private destroy$ = new Subject<void>();
   private cols = 10;
@@ -24,16 +29,42 @@ export class AppComponent implements OnInit, OnDestroy {
   private gameSpeed: number = 500;
   private gameSpeedSubject = new BehaviorSubject(this.gameSpeed);
   private speedSteps = 20;
+  private goal = Infinity;
+  private spawnFood: boolean = true;
+  private colors = {
+    snake: '#DBE000',
+    food: '#32E070',
+    blocker: '#888E94',
+    free: 'black'
+  };
 
   ngOnInit(): void {
-    this.start();
+    this.subscribeToLevelChanges();
   }
 
-  start(): void {
+  private subscribeToLevelChanges(): void {
+    this.levelChange$.subscribe(level => this.loadGamefieldAndCountDown(level));
+  }
+
+  getLevelForSelect(): number[] {
+    return level.map((_, i) => i);
+  }
+
+  loadGamefieldAndCountDown(selectedLevel: number = 0): void {
     this.destroy$.next();
-    this.initGame(level[0]);
-    this.registerEventListeners();
-    this.startGame();
+    this.initGame(level[selectedLevel]);
+
+    this.countdown = 3;
+    interval(1000)
+      .pipe(
+        takeWhile(_ => this.countdown > 0),
+        map(_ => this.countdown--),
+        filter(_ => this.countdown === 0))
+      .subscribe(_ => {
+        this.registerEventListeners();
+        this.startGame();
+      });
+
   }
 
   getHeadRotation(): number {
@@ -64,15 +95,15 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getColor(field: number): string {
     if (this.snake.includes(field)) {
-      return '#DBE000';
+      return this.colors.snake;
     }
     if (this.food.includes(field)) {
-      return '#32E070';
+      return this.colors.food;
     }
     if (this.blocker.includes(field)) {
-      return '#888E94';
+      return this.colors.blocker;
     }
-    return 'transparent';
+    return this.colors.free;
   }
 
   private getRandomSnake(): number[] {
@@ -86,9 +117,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getRandomPosition(): number {
     const blockedPositions = [...this.snake, ...this.food, ...this.blocker];
-    let position = Math.floor(Math.random() * this.cols * this.rows);
+    const ranomPosition = () => Math.floor(Math.random() * this.cols * this.rows);
+    let position = ranomPosition();
     while (blockedPositions.includes(position)) {
-      position = Math.floor(Math.random() * this.cols * this.rows);
+      position = ranomPosition();
     }
 
     return position;
@@ -96,8 +128,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private startGame() {
     this.gameSpeedSubject
-      .pipe(takeUntil(this.destroy$),
-        switchMap(gameSpeed => interval(gameSpeed).pipe(takeUntil(this.destroy$))))
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(gameSpeed => interval(gameSpeed)
+          .pipe(takeUntil(this.destroy$)))
+      )
       .subscribe(_ => this.moveSnake());
   }
 
@@ -119,13 +154,21 @@ export class AppComponent implements OnInit, OnDestroy {
     if (snakeHasToEat) {
       this.eat(nextHead);
     }
+
+    const playerWins = this.points === this.goal;
+    if (playerWins) {
+      this.destroy$.next();
+    }
   }
 
   private eat(nextHead: number): void {
     this.food = this.food.filter(f => f !== nextHead);
-    this.food.push(this.getRandomPosition());
+    if (this.spawnFood) {
+      this.food.push(this.getRandomPosition());
+    }
     this.gameSpeed = this.gameSpeed - this.speedSteps;
     this.gameSpeedSubject.next(this.gameSpeed);
+    this.points++;
   }
 
   private getNextPosition(index: number, direction: Direction): number {
@@ -174,6 +217,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.direction = level?.direction ? level.direction : Direction.up;
     this.gameSpeed = level?.gameSpeed ? level.gameSpeed : 500;
     this.speedSteps = level?.speedSteps ? level.speedSteps : 20;
+    this.goal = level?.goal ? level.goal : Infinity;
+    this.spawnFood = level?.hasOwnProperty('spawnFood') ? !!level.spawnFood : true;
 
     let i = 0;
     for (let row = 0; row < this.rows; row++) {
@@ -184,6 +229,13 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+}
+
+enum BlockType {
+  snake,
+  food,
+  block,
+  empty
 }
 
 enum KeyCode {
@@ -198,14 +250,16 @@ enum Direction {
 }
 
 interface Level {
-  snake: number[];
-  food: number[];
-  blocker: number[];
-  rows: number;
-  cols: number;
-  direction: Direction;
-  gameSpeed: number;
-  speedSteps: number;
+  snake?: number[];
+  food?: number[];
+  blocker?: number[];
+  rows?: number;
+  cols?: number;
+  direction?: Direction;
+  gameSpeed?: number;
+  speedSteps?: number;
+  goal?: number;
+  spawnFood?: boolean;
 }
 
 const level: Level[] = [
@@ -215,12 +269,17 @@ const level: Level[] = [
     rows: 10,
     direction: Direction.right,
     food: [15],
-    gameSpeed: 500,
+    gameSpeed: 300,
     snake: [55, 54, 53],
     speedSteps: 20
   },
   {
-    blocker: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 19, 29, 39, 49, 59, 69, 79, 89, 99, 91, 92, 93, 94, 95, 96, 97, 98],
+    blocker: [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+      10, 20, 30, 40, 50, 60, 70, 80, 90,
+      19, 29, 39, 49, 59, 69, 79, 89, 99,
+      91, 92, 93, 94, 95, 96, 97, 98
+    ],
     cols: 10,
     rows: 10,
     direction: Direction.right,
@@ -228,5 +287,22 @@ const level: Level[] = [
     gameSpeed: 500,
     snake: [55, 54, 53],
     speedSteps: 20
+  },
+  {
+    blocker: [
+      25, 28, 37, 40, 49, 50, 51, 52,
+      31, 34, 43, 46, 55, 56, 57, 58,
+      85, 88, 97, 100, 109, 110, 111, 112,
+      91, 94, 103, 106, 115, 116, 117, 118
+    ],
+    cols: 12,
+    rows: 12,
+    direction: Direction.right,
+    food: [38, 44, 98, 104],
+    gameSpeed: 500,
+    snake: [75, 74, 73],
+    speedSteps: 20,
+    goal: 4,
+    spawnFood: false
   }
 ];

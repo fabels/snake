@@ -1,4 +1,11 @@
 <div class="gamefield-container">
+  <div>
+    <select [ngModel]="currentLevel"
+            (ngModelChange)="levelChange$.next($event)">
+      <option *ngFor="let levelIndex of getLevelForSelect()"
+              [value]="levelIndex">{{ levelIndex }}</option>
+    </select>
+  </div>
 
   <div class="gamefield"
        [style.width.px]="getGamefieldWidth()"
@@ -16,4 +23,9 @@
       <div *ngIf="isHead(index)">:)</div>
     </div>
   </div>
+</div>
+
+<div *ngIf="countdown > 0"
+     class="countdown">
+  {{ countdown }}
 </div>
