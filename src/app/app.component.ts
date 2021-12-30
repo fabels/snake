@@ -19,7 +19,7 @@ export class AppComponent implements OnInit, OnDestroy {
   countdown = 3;
   blockType = BlockType;
 
-  private destroy$ = new Subject<void>();
+  private gameOver$ = new Subject<void>();
   private cols = 10;
   private rows = 10;
   private direction!: Direction;
@@ -51,7 +51,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadGamefieldAndCountDown(selectedLevel: number = 0): void {
-    this.destroy$.next();
+    this.gameOver$.next();
     this.initGame(level[selectedLevel]);
 
     this.countdown = 3;
@@ -81,8 +81,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.unsubscribe();
+    this.gameOver$.next();
+    this.gameOver$.unsubscribe();
   }
 
   getGamefieldWidth(): number {
@@ -129,35 +129,31 @@ export class AppComponent implements OnInit, OnDestroy {
   private startGame() {
     this.gameSpeedSubject
       .pipe(
-        takeUntil(this.destroy$),
+        takeUntil(this.gameOver$),
         switchMap(gameSpeed => interval(gameSpeed)
-          .pipe(takeUntil(this.destroy$)))
+          .pipe(takeUntil(this.gameOver$)))
       )
       .subscribe(_ => this.moveSnake());
   }
 
   private moveSnake(): void {
     const nextHead = this.getNextPosition(this.snake[0], this.direction);
-    const snakeHasToEat = this.food.includes(nextHead);
     const snakeIsDoingCannibalism = this.snake.includes(nextHead);
     const snakeIsEatingBlocker = this.blocker.includes(nextHead);
-    this.snake.unshift(nextHead);
 
     if (snakeIsDoingCannibalism || snakeIsEatingBlocker) {
-      this.destroy$.next();
+      this.gameOver$.next();
+      return;
     }
 
-    if (!snakeHasToEat) {
-      this.snake.pop();
-    }
+    const snakeHasToEat = this.food.includes(nextHead);
+    this.snake.unshift(nextHead);
 
-    if (snakeHasToEat) {
-      this.eat(nextHead);
-    }
+    snakeHasToEat ? this.eat(nextHead) : this.snake.pop();
 
     const playerWins = this.points === this.goal;
     if (playerWins) {
-      this.destroy$.next();
+      this.gameOver$.next();
     }
   }
 
@@ -166,9 +162,9 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.spawnFood) {
       this.food.push(this.getRandomPosition());
     }
-    this.gameSpeed = this.gameSpeed - this.speedSteps;
-    this.gameSpeedSubject.next(this.gameSpeed);
     this.points++;
+    this.gameSpeed = this.gameSpeed - this.speedSteps / (this.points + 1);
+    this.gameSpeedSubject.next(this.gameSpeed);
   }
 
   private getNextPosition(index: number, direction: Direction): number {
@@ -191,7 +187,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private registerEventListeners(): void {
     fromEvent(document, 'keydown')
-      .pipe(takeUntil(this.destroy$))
+      .pipe(takeUntil(this.gameOver$))
       .subscribe(keydownEvent => {
         switch ((keydownEvent as KeyboardEvent).code) {
           case KeyCode.ArrowLeft: this.direction = Direction.left; break;
