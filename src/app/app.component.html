@@ -1,10 +1,20 @@
 <div class="gamefield-container">
-  <div>
-    <select [ngModel]="currentLevel"
-            (ngModelChange)="levelChange$.next($event)">
-      <option *ngFor="let levelIndex of getLevelForSelect()"
-              [value]="levelIndex">{{ levelIndex }}</option>
-    </select>
+
+  <div class="gamefield-menu"
+       [style.width.px]="getGamefieldWidth()">
+
+    <div>
+      Level:
+      <select [ngModel]="currentLevel"
+              (ngModelChange)="levelChange$.next($event)">
+        <option *ngFor="let levelIndex of getLevelForSelect()"
+                [value]="levelIndex">{{ levelIndex + 1 }}</option>
+      </select>
+    </div>
+
+    <button (click)="loadGamefieldAndCountDown(currentLevel)">neustart</button>
+
+    <div class="points">Punkte: {{ points }}</div>
   </div>
 
   <div class="gamefield"
@@ -17,10 +27,7 @@
          [style.margin.px]="blockMargin"
          [style.borderWidth.px]="blockBorderWidth"
          [style.backgroundColor]="getColor(index)"
-         [ngClass]="{'head': isHead(index)}"
-         [style.transform]="'rotate(' + getHeadRotation() + 'deg)'"
          *ngFor="let field of gamefield; let index = index">
-      <div *ngIf="isHead(index)">:)</div>
     </div>
   </div>
 </div>
@@ -29,3 +36,15 @@
      class="countdown">
   {{ countdown }}
 </div>
+<ng-container *ngIf="gameState$ | async as currentGameState">
+
+  <div *ngIf="currentGameState === gameState.gameover"
+       class="gameState">
+    gameover
+  </div>
+
+  <div *ngIf="currentGameState === gameState.winning"
+       class="countdown">
+    gewonnen
+  </div>
+</ng-container>

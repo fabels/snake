@@ -7,6 +7,23 @@
     flex-direction: column;
 }
 
+.gamefield-menu {
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.points {
+    font-size: 17px;
+}
+
+ select {
+     padding: 5px;
+     border-radius: 5px;
+ }
+
 .gamefield {
     display: flex;
     justify-content: center;
@@ -21,16 +38,15 @@
     border-radius: 15%;
 }
 
-.head {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 100%;
-    color: black;
-    transform: rotate(90deg);
+.countdown {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10rem;
 }
 
-.countdown {
+.gameState {
     position: absolute;
     top: 50%;
     left: 50%;

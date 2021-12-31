@@ -17,9 +17,9 @@ export class AppComponent implements OnInit, OnDestroy {
   currentLevel = 0;
   levelChange$ = new BehaviorSubject(0);
   countdown = 3;
-  blockType = BlockType;
+  gameState$ = new Subject<GameState>();
+  gameState = GameState;
 
-  private gameOver$ = new Subject<void>();
   private cols = 10;
   private rows = 10;
   private direction!: Direction;
@@ -43,7 +43,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private subscribeToLevelChanges(): void {
-    this.levelChange$.subscribe(level => this.loadGamefieldAndCountDown(level));
+    this.levelChange$.subscribe(level => {
+      this.currentLevel = level;
+      this.loadGamefieldAndCountDown(level);
+      (document.querySelector('select') as HTMLSelectElement).blur();
+    });
   }
 
   getLevelForSelect(): number[] {
@@ -51,12 +55,13 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   loadGamefieldAndCountDown(selectedLevel: number = 0): void {
-    this.gameOver$.next();
+    this.gameState$.next(GameState.restart);
     this.initGame(level[selectedLevel]);
 
     this.countdown = 3;
     interval(1000)
       .pipe(
+        takeUntil(this.gameState$),
         takeWhile(_ => this.countdown > 0),
         map(_ => this.countdown--),
         filter(_ => this.countdown === 0))
@@ -67,22 +72,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   }
 
-  getHeadRotation(): number {
-    switch (this.direction) {
-      case Direction.up: return 90;
-      case Direction.right: return 180;
-      case Direction.down: return 270;
-      case Direction.left: return 0;
-    }
-  }
-
-  isHead(index: number): boolean {
-    return this.snake[0] === index;
-  }
-
   ngOnDestroy(): void {
-    this.gameOver$.next();
-    this.gameOver$.unsubscribe();
+    this.gameState$.next(GameState.gameover);
+    this.gameState$.unsubscribe();
   }
 
   getGamefieldWidth(): number {
@@ -129,9 +121,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private startGame() {
     this.gameSpeedSubject
       .pipe(
-        takeUntil(this.gameOver$),
+        takeUntil(this.gameState$),
         switchMap(gameSpeed => interval(gameSpeed)
-          .pipe(takeUntil(this.gameOver$)))
+          .pipe(takeUntil(this.gameState$)))
       )
       .subscribe(_ => this.moveSnake());
   }
@@ -142,7 +134,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const snakeIsEatingBlocker = this.blocker.includes(nextHead);
 
     if (snakeIsDoingCannibalism || snakeIsEatingBlocker) {
-      this.gameOver$.next();
+      this.gameState$.next(GameState.gameover);
       return;
     }
 
@@ -153,7 +145,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const playerWins = this.points === this.goal;
     if (playerWins) {
-      this.gameOver$.next();
+      this.gameState$.next(GameState.winning);
     }
   }
 
@@ -187,13 +179,26 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private registerEventListeners(): void {
     fromEvent(document, 'keydown')
-      .pipe(takeUntil(this.gameOver$))
+      .pipe(
+        takeUntil(this.gameState$)
+      )
       .subscribe(keydownEvent => {
+        const validateDirectionChange = (currentDirection: Direction, nextDirection: Direction): Direction => {
+          if (
+            currentDirection === Direction.left && nextDirection === Direction.right ||
+            currentDirection === Direction.right && nextDirection === Direction.left ||
+            currentDirection === Direction.up && nextDirection === Direction.down ||
+            currentDirection === Direction.down && nextDirection === Direction.up
+          ) {
+            return currentDirection;
+          }
+          return nextDirection;
+        }
         switch ((keydownEvent as KeyboardEvent).code) {
-          case KeyCode.ArrowLeft: this.direction = Direction.left; break;
-          case KeyCode.ArrowUp: this.direction = Direction.up; break;
-          case KeyCode.ArrowRight: this.direction = Direction.right; break;
-          case KeyCode.ArrowDown: this.direction = Direction.down; break;
+          case KeyCode.ArrowLeft: this.direction = validateDirectionChange(this.direction, Direction.left); break;
+          case KeyCode.ArrowUp: this.direction = validateDirectionChange(this.direction, Direction.up); break;
+          case KeyCode.ArrowRight: this.direction = validateDirectionChange(this.direction, Direction.right); break;
+          case KeyCode.ArrowDown: this.direction = validateDirectionChange(this.direction, Direction.down); break;
         }
       }
       );
@@ -205,16 +210,18 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private initGame(level?: Level): void {
     this.gamefield = [];
+    this.points = 0;
     this.rows = level?.rows ? level.rows : 10;
     this.cols = level?.cols ? level.cols : 10;
-    this.snake = level?.snake ? level.snake : this.getRandomSnake();
-    this.food = level?.food ? level.food : [this.getRandomPosition()];
-    this.blocker = level?.blocker ? level.blocker : [];
+    this.snake = level?.snake ? [...level.snake] : this.getRandomSnake();
+    this.food = level?.food ? [...level.food] : [this.getRandomPosition()];
+    this.blocker = level?.blocker ? [...level.blocker] : [];
     this.direction = level?.direction ? level.direction : Direction.up;
     this.gameSpeed = level?.gameSpeed ? level.gameSpeed : 500;
     this.speedSteps = level?.speedSteps ? level.speedSteps : 20;
     this.goal = level?.goal ? level.goal : Infinity;
     this.spawnFood = level?.hasOwnProperty('spawnFood') ? !!level.spawnFood : true;
+    this.blockSize = level?.blockSize ? level.blockSize : 35;
 
     let i = 0;
     for (let row = 0; row < this.rows; row++) {
@@ -227,11 +234,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
 }
 
-enum BlockType {
-  snake,
-  food,
-  block,
-  empty
+enum GameState {
+  restart,
+  gameover,
+  winning
 }
 
 enum KeyCode {
@@ -256,16 +262,18 @@ interface Level {
   speedSteps?: number;
   goal?: number;
   spawnFood?: boolean;
+  blockSize?: number;
 }
 
 const level: Level[] = [
   {
+    blockSize: 15,
     blocker: [],
-    cols: 10,
-    rows: 10,
+    cols: 25,
+    rows: 25,
     direction: Direction.right,
     food: [15],
-    gameSpeed: 300,
+    gameSpeed: 150,
     snake: [55, 54, 53],
     speedSteps: 20
   },
