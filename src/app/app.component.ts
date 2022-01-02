@@ -25,7 +25,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private direction!: Direction;
   private snake: number[] = [];
   private food: number[] = [];
-  private blocker: number[] = [];
+  private blockedBlocks: number[] = [];
   private gameSpeed: number = 500;
   private gameSpeedSubject = new BehaviorSubject(this.gameSpeed);
   private speedSteps = 20;
@@ -42,21 +42,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.subscribeToLevelChanges();
   }
 
-  private subscribeToLevelChanges(): void {
-    this.levelChange$.subscribe(level => {
-      this.currentLevel = level;
-      this.loadGamefieldAndCountDown(level);
-      (document.querySelector('select') as HTMLSelectElement).blur();
-    });
-  }
-
-  getLevelForSelect(): number[] {
+  getLevelsForSelect(): number[] {
     return level.map((_, i) => i);
   }
 
-  loadGamefieldAndCountDown(selectedLevel: number = 0): void {
+  loadGamefieldAndStartCountdown(selectedLevel: number = 0): void {
     this.gameState$.next(GameState.restart);
-    this.initGame(level[selectedLevel]);
+    this.loadLevel(level[selectedLevel]);
 
     this.countdown = 3;
     interval(1000)
@@ -69,7 +61,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.registerEventListeners();
         this.startGame();
       });
-
   }
 
   ngOnDestroy(): void {
@@ -85,17 +76,37 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.rows * this.getBlockSize();
   }
 
-  getColor(field: number): string {
-    if (this.snake.includes(field)) {
+  getColorForBlock(block: number): string {
+    if (this.snake.includes(block)) {
       return this.colors.snake;
     }
-    if (this.food.includes(field)) {
+    if (this.food.includes(block)) {
       return this.colors.food;
     }
-    if (this.blocker.includes(field)) {
+    if (this.blockedBlocks.includes(block)) {
       return this.colors.blocker;
     }
     return this.colors.free;
+  }
+
+  isGameOver(gameState: GameState): boolean {
+    return gameState === GameState.gameover;
+  }
+
+  isGameWon(gameState: GameState): boolean {
+    return gameState === GameState.winning;
+  }
+
+  private subscribeToLevelChanges(): void {
+    this.levelChange$.subscribe(level => {
+      this.currentLevel = level;
+      this.loadGamefieldAndStartCountdown(level);
+      this.removeFocusFromLevelSelect();
+    });
+  }
+
+  private removeFocusFromLevelSelect(): void {
+    (document.querySelector('.level-select') as HTMLSelectElement).blur();
   }
 
   private getRandomSnake(): number[] {
@@ -108,7 +119,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private getRandomPosition(): number {
-    const blockedPositions = [...this.snake, ...this.food, ...this.blocker];
+    const blockedPositions = [...this.snake, ...this.food, ...this.blockedBlocks];
     const ranomPosition = () => Math.floor(Math.random() * this.cols * this.rows);
     let position = ranomPosition();
     while (blockedPositions.includes(position)) {
@@ -129,9 +140,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private moveSnake(): void {
-    const nextHead = this.getNextPosition(this.snake[0], this.direction);
+    const nextHead = this.getNextHeadPosition(this.snake[0], this.direction);
     const snakeIsDoingCannibalism = this.snake.includes(nextHead);
-    const snakeIsEatingBlocker = this.blocker.includes(nextHead);
+    const snakeIsEatingBlocker = this.blockedBlocks.includes(nextHead);
 
     if (snakeIsDoingCannibalism || snakeIsEatingBlocker) {
       this.gameState$.next(GameState.gameover);
@@ -159,7 +170,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.gameSpeedSubject.next(this.gameSpeed);
   }
 
-  private getNextPosition(index: number, direction: Direction): number {
+  private getNextHeadPosition(index: number, direction: Direction): number {
     const row = Math.floor(index / this.rows);
     const rowStart = row * this.cols;
     const rowEnd = rowStart + this.cols - 1;
@@ -208,14 +219,14 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.blockSize + (this.blockMargin * 2) + (this.blockBorderWidth * 2)
   }
 
-  private initGame(level?: Level): void {
+  private loadLevel(level?: Level): void {
     this.gamefield = [];
     this.points = 0;
     this.rows = level?.rows ? level.rows : 10;
     this.cols = level?.cols ? level.cols : 10;
     this.snake = level?.snake ? [...level.snake] : this.getRandomSnake();
     this.food = level?.food ? [...level.food] : [this.getRandomPosition()];
-    this.blocker = level?.blocker ? [...level.blocker] : [];
+    this.blockedBlocks = level?.blocker ? [...level.blocker] : [];
     this.direction = level?.direction ? level.direction : Direction.up;
     this.gameSpeed = level?.gameSpeed ? level.gameSpeed : 500;
     this.speedSteps = level?.speedSteps ? level.speedSteps : 20;

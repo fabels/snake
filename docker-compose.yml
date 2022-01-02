@@ -1,0 +1,5 @@
+services:
+  snake:
+    image: gummelhummel/snake
+    ports:
+      - "8056:80"

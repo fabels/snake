@@ -1,20 +1,23 @@
 <div class="gamefield-container">
 
+  <h1>{{ 'snake' | translate }}</h1>
+
   <div class="gamefield-menu"
        [style.width.px]="getGamefieldWidth()">
 
     <div>
-      Level:
-      <select [ngModel]="currentLevel"
+      {{ 'level' | translate }}:
+      <select class="level-select"
+              [ngModel]="currentLevel"
               (ngModelChange)="levelChange$.next($event)">
-        <option *ngFor="let levelIndex of getLevelForSelect()"
+        <option *ngFor="let levelIndex of getLevelsForSelect()"
                 [value]="levelIndex">{{ levelIndex + 1 }}</option>
       </select>
     </div>
 
-    <button (click)="loadGamefieldAndCountDown(currentLevel)">neustart</button>
+    <button (click)="loadGamefieldAndStartCountdown(currentLevel)">neustart</button>
 
-    <div class="points">Punkte: {{ points }}</div>
+    <div class="points">{{ 'points' | translate }}: {{ points }}</div>
   </div>
 
   <div class="gamefield"
@@ -26,9 +29,19 @@
          [style.height.px]="blockSize"
          [style.margin.px]="blockMargin"
          [style.borderWidth.px]="blockBorderWidth"
-         [style.backgroundColor]="getColor(index)"
-         *ngFor="let field of gamefield; let index = index">
+         [style.backgroundColor]="getColorForBlock(block)"
+         *ngFor="let _ of gamefield; let block = index">
     </div>
+  </div>
+
+  <div class="github-logo">
+    <a target="_about:blank"
+       href="https://github.com/gummelhummel/snake">
+      <img src="/assets/github_logo.png"
+           alt="GitHubLogo"
+           width="32"
+           height="32">
+    </a>
   </div>
 </div>
 
@@ -36,15 +49,15 @@
      class="countdown">
   {{ countdown }}
 </div>
-<ng-container *ngIf="gameState$ | async as currentGameState">
 
-  <div *ngIf="currentGameState === gameState.gameover"
+<ng-container *ngIf="gameState$ | async as currentGameState">
+  <div *ngIf="isGameOver(currentGameState)"
        class="gameState">
-    gameover
+    {{ 'gameover' | translate }}
   </div>
 
-  <div *ngIf="currentGameState === gameState.winning"
+  <div *ngIf="isGameWon(currentGameState)"
        class="countdown">
-    gewonnen
+    {{ 'won' | translate }}
   </div>
 </ng-container>

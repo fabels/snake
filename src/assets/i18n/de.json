@@ -1,0 +1,8 @@
+{
+    "snake": "SNAKE",
+    "level": "Level",
+    "restart": "Neustart",
+    "points": "Punkte",
+    "won": "gewonnen",
+    "gameover": "verloren"
+}
