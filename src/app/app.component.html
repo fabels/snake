@@ -30,6 +30,10 @@
          [style.margin.px]="blockMargin"
          [style.borderWidth.px]="blockBorderWidth"
          [style.backgroundColor]="getColorForBlock(block)"
+         [ngClass]="{
+           'food': isFood(block), 
+           'head': isHead(block)
+          }"
          *ngFor="let _ of gamefield; let block = index">
     </div>
   </div>

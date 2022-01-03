@@ -38,6 +38,14 @@ export class AppComponent implements OnInit, OnDestroy {
     free: 'black'
   };
 
+  isHead(block: number): boolean {
+    return this.snake[0] === block;
+  }
+
+  isFood(block: number): boolean {
+    return this.food.includes(block);
+  }
+
   ngOnInit(): void {
     this.subscribeToLevelChanges();
   }
@@ -278,10 +286,10 @@ interface Level {
 
 const level: Level[] = [
   {
-    blockSize: 15,
+    blockSize: 35,
     blocker: [],
-    cols: 25,
-    rows: 25,
+    cols: 10,
+    rows: 10,
     direction: Direction.right,
     food: [15],
     gameSpeed: 150,
